@@ -1,4 +1,4 @@
-//db connection
+// dbConnection
 const e = require("express");
 const dbConnection = require("../db/dbConfig");
 const bcrypt = require("bcrypt");
@@ -15,18 +15,16 @@ async function register(req, res) {
 
   try {
     const [user] = await dbConnection.query(
-      "Select username,userid from users where username = ? or email=? ",
+      "select username,userid from users where username = ? or email=?",
       [username, email]
     );
     if (user.length > 0) {
+      res.status(StatusCodes.BAD_REQUEST).json({ msg: "user already exist" });
+    }
+    if (password.length <= 8) {
       return res
         .status(StatusCodes.BAD_REQUEST)
-        .json({ msg: " user already existed" });
-    }
-    if (password.length < 8) {
-      res
-        .status(StatusCodes.BAD_REQUEST)
-        .json({ msg: "Password must be atleast 8 characters" });
+        .json({ msg: "password must be at least 8 characters" });
     }
 
     // encrypt the password
@@ -34,59 +32,57 @@ async function register(req, res) {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     await dbConnection.query(
-      "INSERT INTO users (username,firstname,lastname,email,password) VALUES (?,?,?,?,?) ",
+      "INSERT INTO users (username, firstname,lastname,email,password) VALUES (?,?,?,?,?)",
       [username, firstname, lastname, email, hashedPassword]
     );
-    return res.status(StatusCodes.CREATED).json({ msg: "user registered" });
+    return res.status(StatusCodes.CREATED).json({ msg: "user rgister" });
   } catch (error) {
     console.log(error.message);
     return res
       .status(StatusCodes.INTERNAL_SERVER_ERROR)
-      .json({ msg: "Something went wrong, try again later!" });
+      .json({ msg: "something went wrong, try again later!" });
   }
 }
 
 async function login(req, res) {
   const { email, password } = req.body;
-
   if (!email || !password) {
     return res
       .status(StatusCodes.BAD_REQUEST)
-      .json({ msg: "Please provide all required fields" });
+      .json({ msg: "provide all required fields" });
   }
-
   try {
     const [user] = await dbConnection.query(
-      "select username,userid,password from users where email = ? ",
+      "select username,userid,password from users where email=? ",
       [email]
     );
     if (user.length == 0) {
       return res
         .status(StatusCodes.BAD_REQUEST)
-        .json({ msg: "invalid credential" });
+        .json({ msg: "Invalid credential" });
     }
-
     // compare password
     const isMatch = await bcrypt.compare(password, user[0].password);
+
     if (!isMatch) {
       return res
         .status(StatusCodes.BAD_REQUEST)
         .json({ msg: "invalid credential" });
     }
+
     const username = user[0].username;
     const userid = user[0].userid;
     const token = jwt.sign({ username, userid }, process.env.JWT_SECRET, {
       expiresIn: "1d",
     });
-
     return res
       .status(StatusCodes.OK)
-      .json({ msg: "user login succesfull", token });
-  } catch (erorr) {
+      .json({ msg: "user login successful", token });
+  } catch (error) {
     console.log(error.message);
     return res
       .status(StatusCodes.INTERNAL_SERVER_ERROR)
-      .json({ msg: "An unexpected error occurred." });
+      .json({ msg: "something wnet wrong, try agian later!" });
   }
 }
 
